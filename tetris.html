@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro Tetris with AI Tips</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0d1b2a;
+            --grid-color: #1b263b;
+            --text-color: #e0e1dd;
+            --accent-color: #ffc300;
+            --shadow-color: #415a77;
+            --gemini-purple: #7741d6;
+            --gemini-purple-hover: #9d6cf5;
+        }
+
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 1rem;
+        }
+
+        .game-container {
+            display: flex;
+            gap: 2rem;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        #game-board {
+            border: 4px solid var(--accent-color);
+            border-radius: 8px;
+            box-shadow: 0 0 25px rgba(255, 195, 0, 0.4);
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            min-width: 180px;
+        }
+
+        .info-box {
+            background-color: var(--grid-color);
+            padding: 1rem;
+            border-radius: 8px;
+            border: 2px solid var(--shadow-color);
+            text-align: center;
+        }
+
+        .info-box h2 {
+            font-size: 1rem;
+            margin: 0 0 0.5rem 0;
+            color: var(--accent-color);
+        }
+
+        .info-box p {
+            font-size: 1.2rem;
+            margin: 0;
+        }
+
+        #next-piece-canvas {
+            background-color: transparent;
+        }
+
+        #game-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(13, 27, 42, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 100;
+        }
+
+        #game-overlay h1 {
+            font-size: 2rem;
+            color: var(--accent-color);
+            margin-bottom: 1rem;
+            text-shadow: 3px 3px 0px var(--shadow-color);
+        }
+
+        #start-button {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1.2rem;
+            padding: 1rem 2rem;
+            background-color: var(--accent-color);
+            color: var(--bg-color);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, background-color 0.2s;
+        }
+
+        #start-button:hover {
+            transform: scale(1.05);
+            background-color: #ffd60a;
+        }
+
+        #tip-button {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.9rem;
+            padding: 0.75rem 1rem;
+            background-color: var(--gemini-purple);
+            color: var(--text-color);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, background-color 0.2s;
+            width: 100%;
+        }
+
+        #tip-button:hover {
+            transform: scale(1.05);
+            background-color: var(--gemini-purple-hover);
+        }
+
+        #tip-button:disabled {
+            background-color: #5a5a5a;
+            cursor: not-allowed;
+            transform: scale(1);
+        }
+
+        .modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(13, 27, 42, 0.9);
+            display: none;
+            /* Hidden by default */
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            padding: 1rem;
+        }
+
+        .modal-content {
+            background-color: var(--grid-color);
+            padding: 2rem;
+            border-radius: 8px;
+            border: 2px solid var(--accent-color);
+            text-align: center;
+            max-width: 90%;
+            width: 450px;
+            box-shadow: 0 0 25px rgba(255, 195, 0, 0.4);
+        }
+
+        .modal-content h2 {
+            font-size: 1.5rem;
+            color: var(--accent-color);
+            margin: 0 0 1rem 0;
+        }
+
+        .modal-content p {
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+
+        .modal-content button {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1rem;
+            padding: 0.75rem 1.5rem;
+            background-color: var(--accent-color);
+            color: var(--bg-color);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .modal-content button:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="game-container">
+        <canvas id="game-board"></canvas>
+        <div class="sidebar">
+            <div class="info-box">
+                <h2>SCORE</h2>
+                <p id="score">0</p>
+            </div>
+            <div class="info-box">
+                <h2>LINES</h2>
+                <p id="lines">0</p>
+            </div>
+            <div class="info-box">
+                <h2>LEVEL</h2>
+                <p id="level">0</p>
+            </div>
+            <div class="info-box">
+                <h2>NEXT</h2>
+                <canvas id="next-piece-canvas" width="120" height="120"></canvas>
+            </div>
+            <div class="info-box" style="padding: 0.5rem;">
+                <button id="tip-button">✨ Get a Tip</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-overlay">
+        <h1>Retro Tetris</h1>
+        <button id="start-button">Start Game</button>
+    </div>
+
+    <div id="tip-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>✨ Pro Tip!</h2>
+            <p id="tip-text">Loading...</p>
+            <button id="close-tip-button">Got it!</button>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const boardCanvas = document.getElementById('game-board');
+        const boardCtx = boardCanvas.getContext('2d');
+        const nextCanvas = document.getElementById('next-piece-canvas');
+        const nextCtx = nextCanvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const linesEl = document.getElementById('lines');
+        const levelEl = document.getElementById('level');
+        const overlay = document.getElementById('game-overlay');
+        const startButton = document.getElementById('start-button');
+        const overlayTitle = overlay.querySelector('h1');
+        const tipButton = document.getElementById('tip-button');
+        const tipModal = document.getElementById('tip-modal');
+        const tipText = document.getElementById('tip-text');
+        const closeTipButton = document.getElementById('close-tip-button');
+
+        // --- Game Constants ---
+        const COLS = 10;
+        const ROWS = 20;
+        const BLOCK_SIZE = 30;
+        const COLORS = [
+            null, 'cyan', 'blue', 'orange', 'yellow', 'lime', 'purple', 'red'
+        ];
+        const SHAPES = [
+            [], // 0 index is empty
+            [[0, 0, 0, 0], [1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0]], // I
+            [[2, 0, 0], [2, 2, 2], [0, 0, 0]], // J
+            [[0, 0, 3], [3, 3, 3], [0, 0, 0]], // L
+            [[4, 4], [4, 4]], // O
+            [[0, 5, 5], [5, 5, 0], [0, 0, 0]], // S
+            [[0, 6, 0], [6, 6, 6], [0, 0, 0]], // T
+            [[7, 7, 0], [0, 7, 7], [0, 0, 0]]  // Z
+        ];
+        const POINTS = { 1: 40, 2: 100, 3: 300, 4: 1200 };
+
+        // --- Game State ---
+        let board;
+        let player;
+        let nextPiece;
+        let score;
+        let lines;
+        let level;
+        let gameOver;
+        let animationFrameId;
+        let lastTime = 0;
+        let dropCounter = 0;
+        let dropInterval = 1000; // ms
+
+        // --- Game Logic ---
+
+        /**
+         * Creates a new game board grid.
+         * @returns {number[][]} A 2D array representing the board.
+         */
+        function createBoard() {
+            return Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+        }
+
+        /**
+         * Creates a new Tetromino piece.
+         * @returns {object} The new player piece object.
+         */
+        function createPiece() {
+            const typeId = Math.floor(Math.random() * (SHAPES.length - 1)) + 1;
+            const shape = SHAPES[typeId];
+            return {
+                x: Math.floor(COLS / 2) - Math.floor(shape[0].length / 2),
+                y: 0,
+                shape: shape,
+                color: COLORS[typeId],
+                typeId: typeId
+            };
+        }
+
+        /**
+         * Draws a single block on a given canvas context.
+         * @param {CanvasRenderingContext2D} ctx - The canvas context.
+         * @param {number} x - The x grid coordinate.
+         * @param {number} y - The y grid coordinate.
+         * @param {string} color - The color of the block.
+         */
+        function drawBlock(ctx, x, y, color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+        }
+
+        /**
+         * Draws the entire game state.
+         */
+        function draw() {
+            // Draw main board
+            boardCtx.clearRect(0, 0, boardCanvas.width, boardCanvas.height);
+            board.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value > 0) {
+                        drawBlock(boardCtx, x, y, COLORS[value]);
+                    }
+                });
+            });
+
+            // Draw player piece
+            player.shape.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value > 0) {
+                        drawBlock(boardCtx, player.x + x, player.y + y, player.color);
+                    }
+                });
+            });
+
+            // Draw next piece preview
+            nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+            const previewSize = nextPiece.shape.length;
+            const previewX = (nextCanvas.width / BLOCK_SIZE - previewSize) / 2;
+            const previewY = (nextCanvas.height / BLOCK_SIZE - previewSize) / 2;
+            nextPiece.shape.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value > 0) {
+                        drawBlock(nextCtx, previewX + x, previewY + y, nextPiece.color);
+                    }
+                });
+            });
+        }
+
+        /**
+         * Checks for collision between a piece and the board.
+         * @param {object} piece - The piece to check.
+         * @param {number[][]} gameBoard - The game board grid.
+         * @returns {boolean} True if there is a collision.
+         */
+        function checkCollision(piece, gameBoard) {
+            for (let y = 0; y < piece.shape.length; y++) {
+                for (let x = 0; x < piece.shape[y].length; x++) {
+                    if (piece.shape[y][x] !== 0) {
+                        let newX = piece.x + x;
+                        let newY = piece.y + y;
+                        if (
+                            newX < 0 || newX >= COLS || // Out of bounds horizontally
+                            newY >= ROWS || // Out of bounds vertically
+                            (gameBoard[newY] && gameBoard[newY][newX] !== 0) // Collides with another piece
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Merges the player's piece into the board grid.
+         */
+        function lockPiece() {
+            player.shape.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value !== 0) {
+                        board[player.y + y][player.x + x] = player.typeId;
+                    }
+                });
+            });
+        }
+
+        /**
+         * Resets the player piece to the next piece and generates a new next piece.
+         */
+        function resetPlayer() {
+            player = nextPiece;
+            nextPiece = createPiece();
+            if (checkCollision(player, board)) {
+                gameOver = true;
+                showGameOver();
+            }
+        }
+
+        /**
+         * Clears completed lines from the board.
+         */
+        function clearLines() {
+            let linesCleared = 0;
+            outer: for (let y = ROWS - 1; y >= 0; y--) {
+                for (let x = 0; x < COLS; x++) {
+                    if (board[y][x] === 0) {
+                        continue outer;
+                    }
+                }
+                const row = board.splice(y, 1)[0].fill(0);
+                board.unshift(row);
+                linesCleared++;
+                y++;
+            }
+            if (linesCleared > 0) {
+                score += POINTS[linesCleared] * (level + 1);
+                lines += linesCleared;
+                level = Math.floor(lines / 10);
+                dropInterval = Math.max(100, 1000 - level * 75);
+                updateUI();
+            }
+        }
+
+        /**
+         * Moves the player piece down one step.
+         */
+        function playerDrop() {
+            player.y++;
+            if (checkCollision(player, board)) {
+                player.y--;
+                lockPiece();
+                clearLines();
+                resetPlayer();
+            }
+            dropCounter = 0;
+        }
+
+        /**
+         * Moves the player piece horizontally.
+         * @param {number} dir - Direction to move (-1 for left, 1 for right).
+         */
+        function playerMove(dir) {
+            player.x += dir;
+            if (checkCollision(player, board)) {
+                player.x -= dir;
+            }
+        }
+
+        /**
+         * Rotates the player's piece.
+         */
+        function playerRotate() {
+            const originalShape = player.shape;
+            const rotated = originalShape[0].map((_, colIndex) =>
+                originalShape.map(row => row[colIndex]).reverse()
+            );
+            player.shape = rotated;
+
+            let offset = 1;
+            while (checkCollision(player, board)) {
+                player.x += offset;
+                offset = -(offset + (offset > 0 ? 1 : -1));
+                if (offset > player.shape[0].length) {
+                    player.shape = originalShape;
+                    player.x -= (offset - 1);
+                    return;
+                }
+            }
+        }
+
+        /**
+         * Main game loop.
+         * @param {number} time - The current timestamp from requestAnimationFrame.
+         */
+        function gameLoop(time = 0) {
+            if (gameOver) return;
+
+            const deltaTime = time - lastTime;
+            lastTime = time;
+            dropCounter += deltaTime;
+
+            if (dropCounter > dropInterval) {
+                playerDrop();
+            }
+
+            draw();
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        /**
+         * Updates the score, lines, and level display.
+         */
+        function updateUI() {
+            scoreEl.textContent = score;
+            linesEl.textContent = lines;
+            levelEl.textContent = level;
+        }
+
+        /**
+         * Displays the game over screen.
+         */
+        function showGameOver() {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+            overlayTitle.textContent = 'Game Over';
+            startButton.textContent = 'Play Again';
+            overlay.style.display = 'flex';
+        }
+
+        /**
+         * Initializes and starts the game.
+         */
+        function startGame() {
+            boardCanvas.width = COLS * BLOCK_SIZE;
+            boardCanvas.height = ROWS * BLOCK_SIZE;
+            boardCtx.scale(1, 1);
+            nextCtx.scale(BLOCK_SIZE * 0.7, BLOCK_SIZE * 0.7);
+
+            board = createBoard();
+            nextPiece = createPiece();
+            player = createPiece();
+            score = 0;
+            lines = 0;
+            level = 0;
+            gameOver = false;
+            dropInterval = 1000;
+
+            updateUI();
+
+            overlay.style.display = 'none';
+
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            gameLoop();
+        }
+
+        /**
+         * Fetches a Tetris tip from the Gemini API and displays it.
+         */
+        async function getTetrisTip() {
+            tipButton.disabled = true;
+            tipButton.innerHTML = 'Thinking...';
+            tipText.textContent = 'Loading your tip...';
+            tipModal.style.display = 'flex';
+
+            const prompt = "Give me one short, actionable tip for playing Tetris. The tip should be concise and easy for a beginner to understand. For example: 'Try to keep your stack as flat as possible.' or 'Don't block the rightmost column if you're waiting for an I-piece.'";
+
+            const payload = {
+                contents: [{ role: "user", parts: [{ text: prompt }] }]
+            };
+            const apiKey = ""; // API key is handled by the environment
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    tipText.textContent = text.trim();
+                } else {
+                    tipText.textContent = "Couldn't get a tip right now. Try again in a moment!";
+                }
+            } catch (error) {
+                console.error("Error fetching tip:", error);
+                tipText.textContent = "An error occurred. Please check the console and try again.";
+            } finally {
+                tipButton.disabled = false;
+                tipButton.innerHTML = '✨ Get a Tip';
+            }
+        }
+
+        // --- Event Listeners ---
+        document.addEventListener('keydown', event => {
+            if (gameOver || tipModal.style.display === 'flex') return;
+
+            if (event.key === 'ArrowLeft') {
+                playerMove(-1);
+            } else if (event.key === 'ArrowRight') {
+                playerMove(1);
+            } else if (event.key === 'ArrowDown') {
+                playerDrop();
+            } else if (event.key === 'ArrowUp' || event.key.toLowerCase() === 'x') {
+                playerRotate();
+            } else if (event.key === ' ') { // Hard drop
+                event.preventDefault(); // Prevent page scroll
+                while (!checkCollision(player, board)) {
+                    player.y++;
+                }
+                player.y--;
+                playerDrop();
+            }
+        });
+
+        startButton.addEventListener('click', startGame);
+        tipButton.addEventListener('click', getTetrisTip);
+        closeTipButton.addEventListener('click', () => {
+            tipModal.style.display = 'none';
+        });
+
+    </script>
+</body>
+
+</html>
